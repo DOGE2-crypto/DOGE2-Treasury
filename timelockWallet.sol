@@ -15,6 +15,7 @@ contract TimelockDeposits {
   /// @notice Struct to store details of timelock transactions
   struct timelockTransaction {
     address token;
+    address recipientAddress;
     uint256 value;
     uint256 block;
     bool isExecuted;
@@ -24,9 +25,10 @@ contract TimelockDeposits {
   timelockTransaction[] public transactions;
   
   /// @notice Event emitted when new transaction is queued
-  event AddTransaction(address indexed token, uint256 value, uint256 block, uint256 indexed ID);
+  event AddTransaction(address indexed token, address indexed recipientAddress, uint256 value, uint256 block, uint256 indexed ID);
   /// @notice Event emitted when new transaction is executed
-  event ExecuteTransaction(address indexed token, uint256 value, uint256 block, uint256 indexed ID);
+  event ExecuteTransaction(address indexed token, address indexed recipientAddress, uint256 value, uint256 block, uint256 indexed ID);
+
 
   /// @notice Modifier to make a function callable only by the owner.
   modifier onlyOwner {
@@ -50,9 +52,9 @@ contract TimelockDeposits {
    */
   function requestWithdraw(uint256 _value) external onlyOwner {
     transactions.push(
-        timelockTransaction(address(0), _value, block.number, false, transactions.length)
+        timelockTransaction(address(0), owner, _value, block.number, false, transactions.length)
     );
-    emit AddTransaction(address(0), _value, block.number, transactions.length - 1);
+    emit AddTransaction(address(0), owner, _value, block.number, transactions.length - 1);
   }
 
   /**
@@ -60,11 +62,11 @@ contract TimelockDeposits {
    * @param _token Address of the ERC20 token contract
    * @param _value Value in wei (10^-18)
    */
-  function requestWithdrawToken(address _token, uint _value) external onlyOwner {
+  function requestWithdrawToken(address _token, address _receiver, uint _value) external onlyOwner {
     transactions.push(
-        timelockTransaction(_token, _value, block.number, false, transactions.length)
+        timelockTransaction(_token, _receiver, _value, block.number, false, transactions.length)
     );
-    emit AddTransaction(_token, _value, block.number, transactions.length - 1);
+    emit AddTransaction(_token, _receiver, _value, block.number, transactions.length - 1);
   }
 
   /**
@@ -78,11 +80,11 @@ contract TimelockDeposits {
     // If token address is 0x0, transfer native tokens
     if (transactions[_ID].token == address(0)) owner.transfer(transactions[_ID].value);
     // Otherwise, transfer ERC20 tokens
-    else IERC20(transactions[_ID].token).transfer(owner, transactions[_ID].value);
+    else IERC20(transactions[_ID].token).transfer(transactions[_ID].recipientAddress, transactions[_ID].value);
     
     transactions[_ID].isExecuted = true;
 
-    emit ExecuteTransaction(transactions[_ID].token, transactions[_ID].value, block.number, transactions[_ID].id);
+    emit ExecuteTransaction(transactions[_ID].token, transactions[_ID].recipientAddress, transactions[_ID].value, block.number, transactions[_ID].id);
   }
 
   /// @notice Fallback functions to receive native tokens
